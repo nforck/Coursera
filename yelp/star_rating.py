@@ -1,21 +1,21 @@
 import json
 from datetime import datetime
+from collections import Counter
 # read the data from disk and split into lines
 # we use .strip() to remove the final (empty) line
-with open("yelp_academic_dataset_review.json") as f:
-    reviews = f.read().strip().split("\n")
-
+from itertools import islice
+N = 100000
+# read the data from disk and split into lines
 # each line of the file is a separate JSON object
-reviews = [json.loads(review) for review in reviews[:200000]]
+with open("yelp_academic_dataset_review.json") as f:
+    reviews = [json.loads(review) for review in islice(f, N)]
+
 
 # we're interested in the text of each review
 # and the stars rating, so we load these into
 # separate lists
 texts = [review['text'] for review in reviews]
 stars = [review['stars'] for review in reviews]
-
-
-from collections import Counter
 
 def balance_classes(xs, ys):
     """Undersample xs, ys to balance classes."""
@@ -42,7 +42,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 # This vectorizer breaks text into single words and bi-grams
 # and then calculates the TF-IDF representation
-vectorizer = TfidfVectorizer(ngram_range=(1,2))
+vectorizer = TfidfVectorizer(ngram_range=(1,2), max_features=10000)
 print "finished TFid"
 t1 = datetime.now()
 
@@ -59,37 +59,48 @@ X_train, X_test, y_train, y_test = train_test_split(vectors, balanced_y, test_si
 from sklearn.svm import LinearSVC
 from sklearn import linear_model
 
+
+
+
 # initialise the SVM classifier
 #classifier = LinearSVC()
-classifier = linear_model.LinearRegression()
-
-# train the classifier
-print "start training:"
-t1 = datetime.now()
-print(datetime.now() - t1)
-classifier.fit(X_train, y_train)
-print "end training:"
-print(datetime.now() - t1)
-
-preds = classifier.predict(X_test)
-preds[preds > 5.0] = 5.0
-preds[preds < 1.0] = 1.0
-print(list(preds[:10]))
-print(y_test[:10])
-
-from sklearn import metrics
-print "mean squared error"
-print(metrics.mean_squared_error(y_test, preds))
-print "r2 score"
-print(metrics.r2_score(y_test, preds))
-print "explained_variance_score"
-print(metrics.explained_variance_score(y_test, preds))
-print "mean_absolute_error"
-print(metrics.mean_absolute_error(y_test, preds))
+classifier_lin = linear_model.LinearRegression()
+classifier_lasso = linear_model.LassoCV()
+classifier_ridge = linear_model.RidgeCV()
 
 
-print(texts[0])
-print(texts[4])
+def train_predict(model, x_train, y_train, x_test, y_test, label="model"):
+    from sklearn import metrics
+    # train the classifier
+    print "Start Analysis for " + label
+    print ""
+    print "start training " + label
+    t1 = datetime.now()
+    model.fit(x_train, y_train)
+    print "end training:" + label
+    print(datetime.now() - t1)
+
+    preds = model.predict(x_test)
+    preds[preds > 5.0] = 5.0
+    preds[preds < 1.0] = 1.0
+    print(list(preds[:10]))
+    print(y_test[:10])
+
+    print "mean squared error " + label
+    print(metrics.mean_squared_error(y_test, preds))
+    print "r2 score " + label
+    print(metrics.r2_score(y_test, preds))
+    print "explained_variance_score " + label
+    print(metrics.explained_variance_score(y_test, preds))
+    print "mean_absolute_error " + label
+    print(metrics.mean_absolute_error(y_test, preds))
+
+    print "End Analysis for " + label
+    print ""
+
+train_predict(classifier_lin, X_train, y_train, X_test, y_test, label="linear regression")
+train_predict(classifier_lasso, X_train, y_train, X_test, y_test, label="Lasso")
+train_predict(classifier_ridge, X_train, y_train, X_test, y_test, label="Ridge")
 
 #Classifier
 
